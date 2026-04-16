@@ -1,0 +1,36 @@
+[
+    {
+        "id": 1,
+        "title": "The P2P Voyager",
+        "category": "Tech",
+        "content": "In a decentralized universe, every star acts as a peer node."
+    },
+    {
+        "id": 2,
+        "title": "The Golden Index",
+        "category": "Fantasy",
+        "content": "The ancient librarian used a golden needle to stitch words."
+    },
+    {
+        "title": "Missing ID Doc",
+        "category": "Sci-Fi",
+        "content": "Doc without ID should be skipped."
+    },
+    {
+        "id": 3,
+        "title": "Missing Content Doc",
+        "category": "Tech"
+    },
+    {
+        "id": 4,
+        "title": "Empty Content Doc",
+        "category": "Unknown",
+        "content": "   "
+    },
+    {
+        "id": 1,
+        "title": "Duplicate ID",
+        "category": "Tech",
+        "content": "This ID=1 is duplicate, should be skipped."
+    }
+]

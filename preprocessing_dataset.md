@@ -214,9 +214,9 @@ e:\LEARN\HTPT\
 
 ## Progress
 
-- `[ ]` Phase 1: Load & Validate
-- `[ ]` Phase 2: Text Cleaning
-- `[ ]` Phase 3: Tokenize & Normalize
-- `[ ]` Phase 4: Build Inverted Index
-- `[ ]` Phase 5: Serialize Output
-- `[ ]` Unit Tests
+- [x] Phase 1: Load & Validate
+- [x] Phase 2: Text Cleaning
+- [x] Phase 3: Tokenize & Normalize
+- [x] Phase 4: Build Inverted Index
+- [x] Phase 5: Serialize Output
+- [x] Unit Tests
