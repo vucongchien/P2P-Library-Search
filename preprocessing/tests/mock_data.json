@@ -1,0 +1,36 @@
+[
+  {
+    "id": 1,
+    "title": "The P2P Voyager!",
+    "category": "Tech",
+    "content": "A decentralized universe using PEER node. 1234!!!"
+  },
+  {
+    "id": 2,
+    "title": "Database Systems",
+    "category": "Database",
+    "content": "Database system is crucial for data storage."
+  },
+  {
+    "id": 3,
+    "title": null,
+    "category": "Null Title",
+    "content": "This has no title but valid content."
+  },
+  {
+    "id": 4,
+    "title": "Empty Content",
+    "category": "Empty",
+    "content": ""
+  },
+  {
+    "id": 5,
+    "category": "Missing Fields"
+  },
+  {
+    "id": 2,
+    "title": "Duplicate ID",
+    "category": "Dup",
+    "content": "This doc ID is 2, which already exists."
+  }
+]
