@@ -116,6 +116,7 @@ class Message:
     #   "GET"               payload: {"keyword": str}
     #   "PING"              payload: {}
     #   "STORE_REPLICA"     payload: {"keyword": str, "doc_ids": [int]}
+    #   "TRANSFER_KEYS"     payload: {"keys": {"keyword": [int]}}
 
 @dataclass
 class Response:
@@ -240,7 +241,7 @@ class ChordNode:
     def handle_message(msg: Message) → Response    # dispatcher
     def find_successor(key_id: int) → int          # O(log N) routing
     def closest_preceding_node(key_id: int) → int
-    def put(keyword: str, doc_ids: Set[int])       # DHT store
+    def put(keyword: str, doc_ids: Set[int]) → bool  # DHT store
     def get(keyword: str) → Set[int]               # DHT lookup
     def join(known_node_id: int)
     def stabilize()
@@ -259,6 +260,7 @@ def handle_message(self, message: Message) -> Response:
         "GET":             self._handle_get,
         "PING":            self._handle_ping,
         "STORE_REPLICA":   self._handle_store_replica,
+        "TRANSFER_KEYS":   self._handle_transfer_keys,
     }
     handler = handlers.get(message.type)
     if not handler:
@@ -380,11 +382,16 @@ BƯỚC A — Build Local Index (mỗi peer)
 
 BƯỚC B — Publish vào DHT (qua transport!)
   peer.put("system", {1,5})
+    → Băm "system" bằng deterministic_hash(SHA-1)
     → transport.send(target_peer_id, PUT message)
     → target peer: merge_put (union, không ghi đè)
 
 BƯỚC C — Replicate
-  target peer copy → successor.replica_store
+  target peer TỰ ĐỘNG gửi STORE_REPLICA → successor của nó (ngầm)
+
+BƯỚC D — Churn (Handoff data)
+  Khi node mới join, nó gửi notify.
+  Predecessor cũ/mới tự tính lại khoảng, gửi TRANSFER_KEYS bàn giao lại dữ liệu.
 ```
 
 ### 4.3 `query_engine.py`
@@ -421,7 +428,7 @@ class QueryResult:
 ```
 1. Parse: "system AND database" → ["system", "database"]
 2. lookup("system"):
-   initiator.find_successor(hash("system"))
+   initiator.find_successor(deterministic_hash("system"))
    → transport.send() → routing → target peer
    → target peer trả posting list
 3. lookup("database"): tương tự
