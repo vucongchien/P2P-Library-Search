@@ -57,7 +57,8 @@ class TestLocalTransport:
          
          # 5. Xác nhận Transport Log đã sao lưu Metric ghi nhận tin nhắn này đi qua
          assert len(transport.message_log) == 1
-         assert transport.message_log[0] == msg
+         assert transport.message_log[0]["to"] == 10
+         assert transport.message_log[0]["message"] == msg
 
     def test_send_message_node_not_found(self):
         """Kiểm tra lỗi trả về khi Transport gửi nhầm tuyến cho Node không tồn tại."""

@@ -10,7 +10,7 @@ class Transport(ABC):
     """
     def __init__(self):
         self.registry: Dict[int, Any] = {}          # node_id -> address (hoặc object)
-        self.message_log: List[Message] = []        # log mọi message để phục vụ metrics
+        self.message_log: List[Dict[str, Any]] = [] # MỚI: {"to": to_node_id, "message": message}
 
     @abstractmethod
     def send(self, to_node_id: int, message: Message, timeout_ms: int = 5000) -> Response:
@@ -32,8 +32,11 @@ class LocalTransport(Transport):
     registry: node_id -> ChordNode object reference
     """
     def send(self, to_node_id: int, message: Message, timeout_ms: int = 5000) -> Response:
-        # Ghi log message để phân tích later
-        self.message_log.append(message)
+        # Ghi log message để phân tích later (Bổ sung receiver_id để hỗ trợ vẽ đường Hops)
+        self.message_log.append({
+            "to": to_node_id,
+            "message": message
+        })
         
         # Mô phỏng rớt mạng: target không tồn tại
         if to_node_id not in self.registry:
