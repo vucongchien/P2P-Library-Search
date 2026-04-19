@@ -1,6 +1,6 @@
 from typing import List, Optional, Set, Dict
 from src.transport import Transport
-from src.models import Message, ErrorCode
+from src.models import Message, ErrorCode, Response
 
 from .dispatcher_mixin import DispatcherMixin
 from .routing_mixin import RoutingMixin
@@ -26,6 +26,9 @@ class ChordNode(DispatcherMixin, RoutingMixin, StorageMixin):
         # === Mạng Storage Initial State ===
         self.dht_store: Dict[str, Set[int]] = {}
         self.replica_store: Dict[str, Set[int]] = {}
+        
+        # === Local Node State ===
+        self.local_index: Dict[str, Set[int]] = {}
 
     def put(self, keyword: str, doc_ids: Set[int]) -> bool:
         """API Công Khai để đẩy chỉ mục Index vào DHT."""
@@ -46,7 +49,7 @@ class ChordNode(DispatcherMixin, RoutingMixin, StorageMixin):
             
         return True
 
-    def get(self, keyword: str) -> Set[int]:
+    def get(self, keyword: str) -> Response:
         """API Công Khai để đọc chỉ mục từ DHT phục vụ tìm kiếm."""
         key_id = deterministic_hash(keyword, self.m)
         target_node = self.find_successor(key_id)
@@ -56,10 +59,4 @@ class ChordNode(DispatcherMixin, RoutingMixin, StorageMixin):
              Message("GET", self.node_id, {"keyword": keyword})
         )
         
-        if not response.success:
-            # DHT có thể bị lỗi truy xuất nhất thời
-            if response.error == ErrorCode.NODE_UNREACHABLE:
-                print(f"[Warning] Node {target_node} unreachable, data for '{keyword}' might be missed.")
-            return set()
-            
-        return set(response.data.get("doc_ids", []))
+        return response

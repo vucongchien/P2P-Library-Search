@@ -9,6 +9,32 @@ class StorageMixin:
     """
     dht_store: Dict[str, Set[int]]
     replica_store: Dict[str, Set[int]]
+    local_index: Dict[str, Set[int]] # (new) local state
+
+    def load_local_index(self, index_data: Dict[str, List[int]]):
+        """
+        Nạp dữ liệu từ kho lưu trữ Local (giả lập việc quét ổ cứng).
+        Đảm bảo Node có nhận thức độc lập về dữ liệu của mình.
+        """
+        if not hasattr(self, 'local_index'):
+             self.local_index = {}
+             
+        for keyword, doc_ids in index_data.items():
+            if keyword not in self.local_index:
+                self.local_index[keyword] = set()
+            self.local_index[keyword].update(doc_ids)
+
+    def publish(self):
+        """
+        Node tự nguyện kết nối vào mạng DHT và đẩy thông tin Local Index lên.
+        Giúp định hình mạng P2P hoàn toàn tự trị.
+        """
+        if not hasattr(self, 'local_index'):
+            return
+
+        for keyword, doc_ids in self.local_index.items():
+            # Tận dụng hàm self.put (có sẵn ở lớp chính ChordNode)
+            getattr(self, 'put')(keyword, doc_ids)
 
     def _handle_put(self, message: Message) -> Response:
         """Nhận Keyword và đính kèm danh sách tài liệu vào kho. Dùng Union không dùng Overwrite."""
