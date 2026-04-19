@@ -139,5 +139,6 @@ class TestChordRing:
             kid = key_map[kw]
             result = n10.get(kw)
             # Dù dữ liệu đã bị di chuyển, API get() vẫn phải tìm được
-            assert result == {1, 2, 3}, f"Keyword '{kw}' (key_id={kid}) không tìm thấy qua API get()"
+            assert result.success is True, f"Network failed for {kw}"
+            assert set(result.data.get("doc_ids", [])) == {1, 2, 3}, f"Keyword '{kw}' (key_id={kid}) không tìm thấy qua API get()"
 

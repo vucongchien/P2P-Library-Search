@@ -122,10 +122,12 @@ class TestChordNode:
         
         # Test Get thông qua API Node 10, Node 10 call mạng sang 20
         res_docs = self.node_10.get("database")
-        assert res_docs == {1, 2, 3, 4, 5}
+        assert res_docs.success is True
+        assert set(res_docs.data.get("doc_ids", [])) == {1, 2, 3, 4, 5}
         
     def test_storage_get_empty(self):
         self.node_10.successor_id = 20
         # Lấy từ chưa hề có 
         res_docs = self.node_10.get("not_exist")
-        assert res_docs == set()
+        assert res_docs.success is True
+        assert set(res_docs.data.get("doc_ids", [])) == set()
