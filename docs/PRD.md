@@ -1084,6 +1084,6 @@ Phase 5: Delivery (1 ngày)
 | Timeout | **Có ngay từ đầu** | Thêm sau | Tránh sửa interface |
 | Addressing | **node_id only** trong Chord | ip:port | ip:port là chuyện của Transport |
 | Network demo | **FastAPI** | Flask, gRPC | Async-ready, auto docs, modern |
-| Query | **Sequential** | Parallel | Trace rõ ràng |
+| Query | **Incremental Fetch + Early Stop** | Pipelined Distributed Join | Tiết kiệm CPU/Băng thông, dễ debug trace, không phá vỡ Core DHT Interface (Push computation xuống Node quá phức tạp cho kiến trúc hiện tại). |
 | Replication | **r=2** | r=1, r=3 | Cân bằng overhead vs tolerance |
 | Metrics | **Đọc từ transport.message_log** | Instrument Chord | Zero coupling, miễn phí |
