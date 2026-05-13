@@ -14,6 +14,9 @@ class DispatcherMixin:
             "PUT": self._handle_put,
             "GET": self._handle_get,
             "STORE_REPLICA": self._handle_store_replica,
+            "PUT_CONTENT": self._handle_put_content,
+            "GET_CONTENT": self._handle_get_content,
+            "STORE_CONTENT_REPLICA": self._handle_store_content_replica,
             "TRANSFER_KEYS": self._handle_transfer_keys,
             "PING": self._handle_ping
         }
