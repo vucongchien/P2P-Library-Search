@@ -68,9 +68,9 @@
 │                      MỖI PEER                        │
 │                                                      │
 │  ┌──────────────────────────────────────────────┐    │
-│  │ Document Store (phân chia TĨNH)               │    │
-│  │   Peer i giữ doc [i*20 .. i*20+19]            │    │
-│  │   Dùng để: trả content khi ai hỏi nội dung   │    │
+│  │ Document Content Store (DHT)                  │    │
+│  │   doc_id → Story Content JSON                 │    │
+│  │   hash(str(doc_id)) thuộc range nào → peer đó │    │
 │  └──────────────────────────────────────────────┘    │
 │                                                      │
 │  ┌──────────────────────────────────────────────┐    │
@@ -87,13 +87,20 @@
 │  └──────────────────────────────────────────────┘    │
 │                                                      │
 │  ┌──────────────────────────────────────────────┐    │
-│  │ Replica Store (backup từ predecessor)         │    │
+│  │ Replica Store (Index & Content backup)        │    │
 │  └──────────────────────────────────────────────┘    │
 │                                                      │
-│  ⚠️ Peer giữ doc 1-20 KHÔNG nhất thiết giữ index    │
-│     của keyword trong doc đó! Hai lớp khác logic.    │
+│  ⚠️ Peer đóng vai trò cả Indexer và Storage Node  │
 └──────────────────────────────────────────────────────┘
 ```
+
+### 1.4 Môi Trường Demo & Quy Tắc Định Danh (ID Space)
+Nhằm tạo tính nhất quán và dễ dàng mô phỏng hiện tượng Churn/Collision trên máy cục bộ, cấu hình Demo P2P được chốt cứng:
+- **Kích cỡ ID (m bits):** `m = 8` (Không gian mạng $ID \in [0..255]$).
+- **Hàm Băm:** `SHA-1(key) % 256` (Kết quả trả về luôn nhỏ hơn hoặc bằng 255).
+- **Quy mô Mạng (Nodes):** 8 đến 10 Nodes sẽ được kích hoạt để đảm bảo mức phân tán hợp lý. Nodes chạy độc lập mô phỏng qua Port (VD: 8001 -> 8010).
+- **Hệ số Dự Phòng (Replication):** `2` (1 Nội dung sẽ được lưu 2 bản sao: Bản Primary ở Successor, và Bản Backup ở Successor tiếp theo thông qua Replica Store).
+- **Chiến thuật Định danh File Mới (P2P ID Strategy):** Khi thêm truyện mới, hệ thống tự cấp phát ID theo Compound Key: `ID = Node_ID + Timestamp` (VD: `80173000`). Tuyệt đối không dùng ID tịnh tiến `1, 2, 3...` để ngăn va chạm (Collision) khi nhiều thao tác Upload diễn ra phân tán không thông qua cửa sổ trung tâm.
 
 ---
 
@@ -233,16 +240,19 @@ class ChordNode:
     finger_table: List[int]            # List[node_id], size m
 
     # === Storage ===
-    documents: Dict[int, ProcessedDoc] # doc_id → doc
+    content_store: Dict[int, dict]     # doc_id → content
     dht_store: Dict[str, Set[int]]     # keyword → {doc_ids}
-    replica_store: Dict[str, Set[int]] # backup
+    replica_store: Dict[str, Set[int]] # index backup
+    replica_content_store: Dict[int, dict] # content backup
 
     # === Methods ===
     def handle_message(msg: Message) → Response    # dispatcher
     def find_successor(key_id: int) → int          # O(log N) routing
     def closest_preceding_node(key_id: int) → int
-    def put(keyword: str, doc_ids: Set[int]) → bool  # DHT store
-    def get(keyword: str) → Set[int]               # DHT lookup
+    def put(keyword: str, doc_ids: Set[int]) → bool  # DHT Index store
+    def put_content(doc_id: int, content: dict) → bool # DHT Content store
+    def get(keyword: str) → Set[int]               # DHT Index lookup
+    def get_content(doc_id: int) → dict            # DHT Content lookup
     def join(known_node_id: int)
     def stabilize()
     def fix_fingers()

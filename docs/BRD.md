@@ -160,14 +160,15 @@
 
 ---
 
-## 8. Giả Định (Assumptions)
+## 8. Thông Số Mạng (Network Specs) & Giả Định (Assumptions)
 
 1. **Dataset tiếng Anh** — không cần xử lý multi-language.
-2. **Simulated P2P** — các peer là Python objects, message = function call. Đây là cách chuẩn trong học thuật.
-3. **Số peer mặc định = 5** — đủ để demo Chord routing, có thể scale lên 10-20 để test.
-4. **m = 8 bits** — ring size = 256, thừa sức cho 5-20 peer.
-5. **User query từ console** — không cần web UI.
-6. **Không cần stemming** — giữ nguyên từ gốc, dễ trace và debug.
+2. **Kiến trúc Content-First P2P** — Node tự Tokenize và lưu trữ Full-text (thay vì Server giao file xử lý sẵn).
+3. **Số lượng Node mô phỏng = 8 tới 10 Node** — đủ lớn để tạo vòng tròn đan xen, minh họa Churn và Handoff. Mạng sẽ chia tải bằng cách nạp Data vào N-1 Nodes.
+4. **ID Space & Hashing**: `m = 8` bits — không gian vòng ring max là 256. Sử dụng hàm băm `SHA-1 % 256` cho mọi Key (Keywords và Doc ID).
+5. **Định danh Tài liệu ngẫu nhiên toàn cục**: Không dùng ID tịnh tiến `1-100`. ID sử dụng chiến thuật `Node_ID + Timestamp` (VD: `80173004`) để đảm bảo Content luôn được phân tán ngẫu nhiên và giải quyết rủi ro ghi đè khi Upload P2P.
+6. **Replication Factor**: `Replication = 2` (1 Primary lưu tại `Successor`, 1 Backup Copy lưu tại `Successor của Successor` thông qua cơ chế Replica Store).
+7. **User query từ Web Dashboard & REST API**.
 
 ---
 
