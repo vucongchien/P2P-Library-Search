@@ -81,6 +81,10 @@ class TestChordNode:
         
     def test_routing_loop_ttl_prevention(self):
         """Nếu cấu hình sai lệch Topology tạo thành vô cực mượn nhau."""
+        # Setup bypass single-node ring check
+        self.node_10.successor_id = 20
+        self.node_20.successor_id = 10
+        
         # Buộc Node 10 luôn đẩy sang 20, 20 luôn đẩy sang 10
         self.node_10.closest_preceding_node = lambda k: 20
         self.node_20.closest_preceding_node = lambda k: 10
@@ -91,10 +95,9 @@ class TestChordNode:
         rf.in_range = lambda val, start, end, **kwargs: False
         
         try:
-            with pytest.raises(RuntimeError) as exc_info:
-                 self.node_10.find_successor(99) # Truy tìm key
-                 
-            assert "Cannot route" in str(exc_info.value)
+            # find_successor_traced trả RoutingTrace(success=False) khi loop
+            trace = self.node_10.find_successor_traced(99)
+            assert trace.success is False, "Phải phát hiện routing loop (TTL=0)"
         finally:
             rf.in_range = original_in_range
 
@@ -125,9 +128,17 @@ class TestChordNode:
         assert res_docs.success is True
         assert set(res_docs.data.get("doc_ids", [])) == {1, 2, 3, 4, 5}
         
+        # Verify routing_trace được gắn vào response
+        assert "routing_trace" in res_docs.data, "Response phải chứa routing_trace!"
+        trace_data = res_docs.data["routing_trace"]
+        assert "path" in trace_data
+        assert len(trace_data["path"]) > 0, "Routing path phải có ít nhất 1 hop"
+        
     def test_storage_get_empty(self):
         self.node_10.successor_id = 20
         # Lấy từ chưa hề có 
         res_docs = self.node_10.get("not_exist")
         assert res_docs.success is True
         assert set(res_docs.data.get("doc_ids", [])) == set()
+        # Routing trace vẫn phải có
+        assert "routing_trace" in res_docs.data
