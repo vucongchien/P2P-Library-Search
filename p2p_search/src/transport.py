@@ -2,6 +2,7 @@ from abc import ABC, abstractmethod
 from typing import Dict, Any, List
 from .models import Message, Response, ErrorCode
 import logging
+import time
 
 class Transport(ABC):
     """
@@ -10,7 +11,7 @@ class Transport(ABC):
     """
     def __init__(self):
         self.registry: Dict[int, Any] = {}          # node_id -> address (hoặc object)
-        self.message_log: List[Dict[str, Any]] = [] # MỚI: {"to": to_node_id, "message": message}
+        self.message_log: List[Dict[str, Any]] = []  # Log mọi message đã gửi
 
     @abstractmethod
     def send(self, to_node_id: int, message: Message, timeout_ms: int = 5000) -> Response:
@@ -26,17 +27,24 @@ class Transport(ABC):
         if node_id in self.registry:
             del self.registry[node_id]
 
+    def _log_message(self, to_node_id: int, message: Message):
+        """Ghi log message với metadata đầy đủ cho metrics/debug."""
+        self.message_log.append({
+            "from": message.sender_id,
+            "to": to_node_id,
+            "type": message.type,
+            "message": message,
+            "timestamp": time.perf_counter(),
+        })
+
 class LocalTransport(Transport):
     """
     Peers giao tiếp bằng function call truyền thống (Simulated local environment).
     registry: node_id -> ChordNode object reference
     """
     def send(self, to_node_id: int, message: Message, timeout_ms: int = 5000) -> Response:
-        # Ghi log message để phân tích later (Bổ sung receiver_id để hỗ trợ vẽ đường Hops)
-        self.message_log.append({
-            "to": to_node_id,
-            "message": message
-        })
+        # Ghi log message
+        self._log_message(to_node_id, message)
         
         # Mô phỏng rớt mạng: target không tồn tại
         if to_node_id not in self.registry:
