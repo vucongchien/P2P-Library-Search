@@ -94,7 +94,9 @@ return RoutingTrace(
 
 ---
 
-## 5. Minh họa luồng ghi vết (Mermaid)
+## 6. Minh họa luồng ghi vết (Mermaid)
+
+### 6.1. Happy path — không có node chết
 
 ```mermaid
 sequenceDiagram
@@ -112,14 +114,39 @@ sequenceDiagram
     Note over I: Rendering Trace to Dashboard
 ```
 
+### 6.2. Recovery path — node trung gian bị chết
+
+Khi `closest_preceding_node` chỉ tới một node đã rời mạng, Transport trả về `NODE_NOT_FOUND` / `TIMEOUT`. Node hiện tại sẽ thử finger kế tiếp và ghi lại một hop `RECOVERY` để minh chứng đường vòng.
+
+```mermaid
+sequenceDiagram
+    participant I as Initiator (N10)
+    participant A as Node A (N40)
+    participant X as Node X (N55 — DEAD)
+    participant B as Node B (N60)
+
+    I->>A: FIND_SUCCESSOR(Key: 58)
+    Note over A: Finger gần nhất → N55
+    A-xX: FIND_SUCCESSOR(Key: 58)
+    Note over A: Timeout/NODE_NOT_FOUND<br/>action: RECOVERY (fallback finger)
+    A->>B: FIND_SUCCESSOR(Key: 58)
+    Note over B: action: RESOLVED
+    B-->>A: Response {path: [Hop_B]}
+    Note over A: Path = [Hop_A(RECOVERY)] + [Hop_B]
+    A-->>I: Response {path: [Hop_A, Hop_B]}
+    Note over I: Trace cho thấy cả nỗ lực thất bại lẫn đường vòng thành công
+```
+
+> Xem chi tiết cơ chế tự phục hồi tại [[churn_resilience]].
+
 ---
 
-## 6. Ưu điểm của Thuật toán
+## 7. Ưu điểm của Thuật toán
 1.  **Tính xác thực**: Mỗi node tự ghi lại lý do định tuyến của mình (ví dụ: dùng finger table thứ mấy).
 2.  **Khả năng chịu lỗi**: Trace ghi lại cả những nỗ lực `RECOVERY` khi mạng có Churn, giúp người dùng thấy được cách hệ thống tự chữa lành.
 3.  **Hiệu năng**: Trace được mang theo Response, không tạo ra thêm kết nối TCP/HTTP mới.
 
 ---
 
-## 7. Ghi chú triển khai
+## 8. Ghi chú triển khai
 Cần đảm bảo logic `_handle_find_successor` luôn thực hiện việc `prepend` (chèn lên đầu) để đảm bảo thứ tự các hop từ gần đến xa so với Initiator là chính xác.

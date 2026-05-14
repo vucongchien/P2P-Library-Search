@@ -9,17 +9,19 @@ Hệ thống Event Log đóng vai trò là "hộp đen" của mạng Chord, ghi 
 Hiện tại, hệ thống Event hoạt động theo mô hình **Passive Request Logging** (Ghi chép yêu cầu thụ động).
 
 ### 1.1. Cấu trúc dữ liệu (Log Entry)
-Mỗi bản ghi log trong `Transport.message_log` bao gồm:
-- `from`: ID của node gửi.
+Mỗi bản ghi log trong `Transport.message_log` (xem `src/transport.py::_log_message`) bao gồm:
+- `from`: ID của node gửi (`message.sender_id`).
 - `to`: ID của node nhận.
 - `type`: Loại thông điệp (`FIND_SUCCESSOR`, `GET`, `PUT`, `NOTIFY`, `PING`,...).
-- `payload_keys`: Danh sách các key/field có trong gói tin (để bảo mật, không log toàn bộ nội dung).
-- `timestamp`: Thời gian ghi log.
+- `message`: Tham chiếu đến đối tượng `Message` gốc (chứa payload đầy đủ — dashboard tự lọc khi hiển thị).
+- `timestamp`: `time.perf_counter()` tại thời điểm gọi `send()`.
+
+> Ghi chú: Phiên bản hiện tại lưu **toàn bộ Message object**, không phải chỉ `payload_keys`. Dashboard và `LogPanel.jsx` chịu trách nhiệm hiển thị an toàn.
 
 ### 1.2. Cơ chế hoạt động
-1.  **Tại lớp Transport**: Khi hàm `send()` được gọi, nó sẽ gọi `_log_message()` trước khi thực hiện kết nối mạng.
-2.  **Lưu trữ**: Log được lưu trữ trong một danh sách (`List`) tại bộ nhớ RAM của mỗi Node.
-3.  **Thu thập (Polling)**: Dashboard định kỳ gọi tới endpoint `/api/messages` của từng Node để lấy các bản ghi log mới (sử dụng tham số `since` để tối ưu hóa).
+1.  **Tại lớp Transport**: Khi hàm `send()` được gọi, nó gọi `_log_message()` **trước** khi thực hiện kết nối mạng. Áp dụng cho cả `LocalTransport` lẫn `NetworkTransport`.
+2.  **Lưu trữ**: Log được lưu trong một `List` tại bộ nhớ RAM của mỗi peer process (không persist).
+3.  **Thu thập (Polling)**: Dashboard backend (`dashboard_server.py`) gọi `/api/messages?since=<cursor>` trên từng peer, sau đó gộp lại tại endpoint `/api/messages/all` với cursor `since_global` cho frontend.
 
 ---
 
@@ -33,7 +35,15 @@ Mỗi bản ghi log trong `Transport.message_log` bao gồm:
 
 ## 3. Kế hoạch nâng cấp (Future Improvements Plan)
 
-Mục tiêu là chuyển đổi từ ghi log đơn thuần sang **Distributed Tracing**.
+Mục tiêu là chuyển đổi từ ghi log đơn thuần sang **Distributed Tracing**. Tóm tắt trạng thái:
+
+| # | Mục tiêu | Trạng thái | Ghi chú |
+| :--- | :--- | :--- | :--- |
+| 1 | Bidirectional Logging | ❌ TODO | `_log_message` chỉ gọi 1 lần trước `send()`, không log Response. |
+| 2 | Routing Context (`reason`) | 🟡 Partial | `reason` đã có trong `RoutingHop` (xem [[tracing_algorithm]]) nhưng chưa propagate xuống `message_log`. |
+| 3 | Status Highlighting (`success`, `error_code`) | ❌ TODO | `Response.error` đã chuẩn hóa qua `ErrorCode`, nhưng chưa được ghi lại vào log của Transport. |
+| 4 | Log Rotation | ❌ TODO | `message_log` đang là `List` không giới hạn — nguy cơ tràn RAM khi demo dài. |
+| 5 | Real-time Visualization (Event-driven) | ❌ TODO | `ChordRingViz.jsx` hiện tại nhận prop `activeTrace` (render sau khi query xong), chưa subscribe vào stream `messages`. |
 
 ### Mục tiêu 1: Log chiều về (Bidirectional Logging)
 - **Hành động**: Cập nhật `Transport` để ghi log cả khi nhận được `Response`.
