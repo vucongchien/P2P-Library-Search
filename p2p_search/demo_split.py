@@ -39,8 +39,8 @@ def main():
     
     for node_id, port in PEERS.items():
         title = f"Peer Node {node_id}"
-        # Start command prompt and run uvicorn
-        cmd = f'start "{title}" cmd /k "{executable} peer_server.py --node-id {node_id} --port {port} --m 8"'
+        # Start command prompt and run uvicorn with auto-stabilize enabled
+        cmd = f'start "{title}" cmd /k "{executable} peer_server.py --node-id {node_id} --port {port} --m 8 --auto-stabilize"'
         os.system(cmd)
         print(f"  -> Đã mở CMD cho Node {node_id} @ port {port}")
     

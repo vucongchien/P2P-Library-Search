@@ -25,6 +25,7 @@ import sys
 import os
 import logging
 import json
+import asyncio
 
 # UTF-8 cho Windows
 if hasattr(sys.stdout, 'reconfigure'):
@@ -120,6 +121,40 @@ def create_app(node_id: int, port: int, m: int = 8) -> FastAPI:
     app.state.port = port
     app.state.m = m
     app.state.is_joined = False  # track trạng thái join
+    
+    # ============================================================
+    # Background Maintenance Task (Autonomous Self-Healing)
+    # ============================================================
+    
+    def run_maintenance_sync(interval: int):
+        """Vòng lặp chạy trong Thread riêng để không block Event Loop của FastAPI."""
+        logger.info(f"N{node_id}: Starting autonomous maintenance thread (interval={interval}s)")
+        while True:
+            try:
+                # Thực hiện bảo trì với timeout ngắn (ví dụ 1s) để thoát nhanh nếu node chết
+                # Lưu ý: Chúng ta gọi trực tiếp các hàm sync của node
+                node.stabilize()
+                node.fix_fingers()
+                node.check_predecessor()
+                
+                # Log trạng thái định kỳ để người dùng dễ theo dõi
+                logger.info(f"N{node_id} STATE: Successor=N{node.successor_id}, Predecessor=N{node.predecessor_id if node.predecessor_id else 'None'}")
+                
+            except Exception as e:
+                # logger.error(f"N{node_id}: Maintenance cycle error: {e}")
+                pass
+            
+            import time
+            time.sleep(interval)
+
+    @app.on_event("startup")
+    async def startup_event():
+        if getattr(app.state, "auto_stabilize", False):
+            interval = getattr(app.state, "stabilize_interval", 5)
+            # Chạy vòng lặp bảo trì trong một Thread riêng biệt (Daemon)
+            import threading
+            thread = threading.Thread(target=run_maintenance_sync, args=(interval,), daemon=True)
+            thread.start()
     
     # Self-register: node biết về chính nó
     transport.register(node_id, f"http://127.0.0.1:{port}")
@@ -473,7 +508,9 @@ def parse_args():
     parser = argparse.ArgumentParser(description="Chord Peer Server")
     parser.add_argument("--node-id", type=int, required=True, help="Node ID trong Chord ring")
     parser.add_argument("--port", type=int, required=True, help="HTTP port để lắng nghe")
-    parser.add_argument("--m", type=int, default=8, help="Chord address space bits (default: 8, max 256 nodes)")
+    parser.add_argument("--m", type=int, default=8, help="Chord address space bits (default: 8)")
+    parser.add_argument("--auto-stabilize", action="store_true", help="Bật chế độ tự động bảo trì mạng chạy ngầm")
+    parser.add_argument("--stabilize-interval", type=int, default=5, help="Khoảng cách giữa các chu kỳ bảo trì (giây)")
     return parser.parse_args()
 
 
@@ -483,6 +520,10 @@ def main():
     logger.info(f"Starting Chord Peer N{args.node_id} on port {args.port} (m={args.m})")
     
     app = create_app(node_id=args.node_id, port=args.port, m=args.m)
+    
+    # Lưu config vào app state để startup_event sử dụng
+    app.state.auto_stabilize = args.auto_stabilize
+    app.state.stabilize_interval = args.stabilize_interval
     
     import uvicorn
     uvicorn.run(
