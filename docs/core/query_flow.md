@@ -26,9 +26,18 @@ Mục tiêu chính: **Tối thiểu hóa số lượng thông điệp mạng (Ne
 ### Bước 2: Vòng lặp Truy vấn Tăng dần (Incremental Fetch)
 Với mỗi từ khóa $K_i$ trong danh sách:
 
-1. **Định tuyến (Routing)**: Initiator băm từ khóa $H = \text{hash}(K_i)$ và sử dụng bảng Finger Table để tìm node $N_{resp}$ chịu trách nhiệm quản lý ID $H$.
-2. **Lấy dữ liệu (Fetch)**: Gửi thông điệp `GET(K_i)` tới node $N_{resp}$.
-3. **Nhận kết quả**: $N_{resp}$ trả về `Posting List` (danh sách ID tài liệu) kèm theo `Routing Trace` (dấu vết đường đi thực tế).
+1. **Định tuyến (Routing Phase)**: 
+   - Initiator băm từ khóa $H = \text{hash}(K_i)$.
+   - Sử dụng thuật toán Chord $O(\log N)$, yêu cầu tìm kiếm được chuyển tiếp qua các node trung gian.
+   - **Kết quả trả về**: Thông tin chặng đi (`path`) được tích lũy và trả về **ngược theo đường cũ** (quay lui) về cho Initiator.
+
+2. **Lấy dữ liệu (Retrieval Phase)**:
+   - Sau khi nhận được ID của node chịu trách nhiệm ($N_{resp}$), Initiator gửi một thông điệp `GET` **trực tiếp** tới node đó.
+   - Node $N_{resp}$ trả về Posting List (danh sách ID doc) trực tiếp cho Initiator.
+   - *Lý do*: Tránh việc chuyển dữ liệu lớn (Posting List) qua nhiều chặng trung gian, giảm độ trễ mạng.
+
+3. **Giao tập kết quả (Incremental Intersection)**:
+ $N_{resp}$ trả về `Posting List` (danh sách ID tài liệu) kèm theo `Routing Trace` (dấu vết đường đi thực tế).
 
 ### Bước 3: Giao tập hợp (Intersection)
 - Duy trì một tập kết quả tạm thời `FinalSet`.
