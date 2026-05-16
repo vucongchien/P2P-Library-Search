@@ -19,6 +19,7 @@ class ChordNode(DispatcherMixin, RoutingMixin, StorageMixin):
         
         # === Mạng Routing Initial State ===
         self.successor_id = node_id
+        self.successor_list: List[int] = [node_id]  # Khởi tạo với chính mình
         self.predecessor_id = None
         self.finger_table: List[Optional[int]] = [None] * m
         self.next_finger_to_fix = 0

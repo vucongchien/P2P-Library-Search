@@ -11,10 +11,11 @@ Cơ chế Self-healing được xây dựng dựa trên 3 thuật toán định 
 ### 1.1. Stabilize (Ổn định Successor)
 - **Mục tiêu**: Đảm bảo con trỏ `successor` luôn trỏ đúng vào node kế tiếp theo thứ tự ID.
 - **Quy trình**:
-  1. Node $N$ hỏi successor của mình ($S$): "Ai là predecessor của bạn?".
-  2. $S$ trả lời là $X$.
+1. Node $N$ hỏi successor của mình ($S$): "Ai là predecessor của bạn và danh sách successor của bạn là gì?".
+  2. $S$ trả lời predecessor là $X$ và danh sách successor dự phòng là $L$.
   3. Nếu $X$ nằm giữa $N$ và $S$, Node $N$ cập nhật successor mới là $X$.
-  4. Node $N$ thông báo cho successor mới biết về sự tồn tại của mình (`notify`).
+  4. Node $N$ cập nhật danh sách dự phòng của mình: `successor_list = [S] + L[0:r-1]`.
+  5. Node $N$ thông báo cho successor mới biết về sự tồn tại của mình (`notify`).
 
 ### 1.2. Check Predecessor (Kiểm tra Node đứng trước)
 - **Mục tiêu**: Phát hiện sớm việc node đứng trước bị sập.
@@ -37,15 +38,31 @@ Giả sử mạng đang có: `N10 -> N60 -> N110`. Node `N60` đột ngột bị
     - `N10` chạy `stabilize()` và nhận thấy không thể kết nối tới `N60`.
     - `N110` chạy `check_predecessor()` và thấy `N60` không trả lời.
 2.  **Hành động của N10**:
-    - `N10` sử dụng danh sách successor dự phòng (hoặc tìm kiếm lại) để trỏ thẳng tới `N110`.
-    - Vòng tròn được nối lại: `N10 -> N110`.
+    - `N10` chạy `stabilize()` và phát hiện `N60` không phản hồi.
+    - Thay vì quét toàn bộ Finger Table, `N10` ngay lập tức kiểm tra danh sách `successor_list` và thấy `N110` là node dự phòng kế tiếp.
+    - `N10` cập nhật `successor = N110`. Vòng tròn được nối lại ngay lập tức.
 3.  **Hành động của N110**:
     - `N110` nhận thấy `N60` chết. Nó lấy toàn bộ dữ liệu backup của `N60` (đang giữ trong `replica_store`) để đưa vào kho lưu trữ chính.
     - Dữ liệu không bị mất mát.
 
 ---
 
-## 3. Chế độ vận hành (Autonomous Mode)
+## 3. Kịch bản lỗi đa điểm (Multi-Failure Resilience)
+
+Đây là kịch bản nâng cao minh chứng cho sức mạnh của **Successor List**:
+Giả sử mạng có chuỗi: `N10 -> N60 -> N110 -> N160`. Cả `N60` và `N110` cùng sập một lúc.
+
+1.  **Hành động của N10**:
+    - `N10` gọi `stabilize()` và thấy `N60` chết.
+    - `N10` duyệt `successor_list` (đang chứa `[N60, N110, N160]`).
+    - Thử `N110` -> Chết.
+    - Thử `N160` -> **Sống!**
+    - `N10` cập nhật `successor = N160`.
+2.  **Kết quả**: Vòng tròn Chord được nối lại trực tiếp từ `N10` tới `N160` chỉ sau **1 chu kỳ bảo trì**, bỏ qua 2 node đã sập mà không làm vỡ mạng.
+
+---
+
+## 4. Chế độ vận hành (Autonomous Mode)
 
 Hệ thống hỗ trợ 2 chế độ kích hoạt Self-healing:
 

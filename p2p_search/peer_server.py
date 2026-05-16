@@ -433,6 +433,7 @@ def create_app(node_id: int, port: int, m: int = 8) -> FastAPI:
             "m": node.m,
             "is_joined": app.state.is_joined,
             "successor": node.successor_id,
+            "successor_list": getattr(node, "successor_list", []),
             "predecessor": node.predecessor_id,
             "finger_table": finger_table,
             "dht_store": dht_store,

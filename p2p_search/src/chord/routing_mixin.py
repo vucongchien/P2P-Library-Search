@@ -271,17 +271,21 @@ class RoutingMixin:
             )
             if response.success:
                 self.successor_id = response.data["successor"]
+                self.successor_list = [self.successor_id] # Khởi tạo danh sách với 1 successor
                 self.finger_table[0] = self.successor_id # Finger 0 luôn là successor
             else:
                 raise RuntimeError(f"Could not join network via node {known_node_id}: {response.error}")
         else:
             # Đây là node đầu tiên trong mạng
             self.successor_id = self.node_id
+            self.successor_list = [self.node_id]
             self.finger_table[0] = self.node_id
             self.predecessor_id = None
 
     def stabilize(self):
         """Định kỳ kiểm tra successor và thông báo cho nó về sự hiện diện của mình."""
+        r_size = 3 # Số lượng successor dự phòng
+        
         # Hỏi successor về predecessor của nó
         response = self.transport.send(
             self.successor_id,
@@ -290,9 +294,11 @@ class RoutingMixin:
         
         if response.success:
             x = response.data.get("predecessor")
+            # Cập nhật successor_list từ thông tin nhận được
+            succ_list_from_node = response.data.get("successor_list", [])
+            self.successor_list = [self.successor_id] + succ_list_from_node[:r_size-1]
+
             # x ∈ (self, successor)
-            # Điều kiện bootstrap: Nếu ta đang là node duy nhất (successor_id == self.node_id),
-            # và nhận được một x hợp lệ, thì x chính là successor mới.
             is_better_successor = False
             if x is not None and x != self.node_id:
                 if self.successor_id == self.node_id:
@@ -303,18 +309,37 @@ class RoutingMixin:
             if is_better_successor:
                 self.successor_id = x
                 self.finger_table[0] = x # Đồng bộ finger table
+                # Nếu đổi successor, list sẽ được cập nhật ở vòng stabilize sau hoặc ngay tại đây
+                self.successor_list = [self.successor_id] + self.successor_list[:r_size-1]
         else:
-            # Successor đã chết! Phải tìm successor mới từ finger table
+            # Successor đã chết! Phải tìm successor mới từ successor_list
             old_successor = self.successor_id
-            for i in range(1, self.m):
-                finger_id = self.finger_table[i]
-                if finger_id is not None and finger_id != self.node_id:
-                    # Kiểm tra xem node này còn sống không
-                    ping_res = self.transport.send(finger_id, Message("PING", self.node_id))
-                    if ping_res.success:
-                        self.successor_id = finger_id
-                        self.finger_table[0] = finger_id
-                        break
+            found_new = False
+            
+            # Thử các node trong danh sách dự phòng
+            for backup_id in self.successor_list:
+                if backup_id == self.node_id or backup_id == old_successor:
+                    continue
+                ping_res = self.transport.send(backup_id, Message("PING", self.node_id))
+                if ping_res.success:
+                    self.successor_id = backup_id
+                    self.finger_table[0] = backup_id
+                    self.successor_list = [self.successor_id] # Reset list để cập nhật lại sau
+                    found_new = True
+                    break
+            
+            # Nếu list dự phòng cũng sập hết, fallback sang finger table như cũ
+            if not found_new:
+                for i in range(1, self.m):
+                    finger_id = self.finger_table[i]
+                    if finger_id is not None and finger_id != self.node_id and finger_id != old_successor:
+                        ping_res = self.transport.send(finger_id, Message("PING", self.node_id))
+                        if ping_res.success:
+                            self.successor_id = finger_id
+                            self.finger_table[0] = finger_id
+                            self.successor_list = [self.successor_id]
+                            found_new = True
+                            break
             
             # Nếu tìm được Successor mới sau khi cái cũ chết, gửi Re-replicate
             if self.successor_id != old_successor and self.successor_id != self.node_id:
@@ -361,7 +386,10 @@ class RoutingMixin:
                     self._re_replicate(self.successor_id)
 
     def _handle_get_predecessor(self, message: Message) -> Response:
-        return Response(success=True, data={"predecessor": self.predecessor_id})
+        return Response(success=True, data={
+            "predecessor": self.predecessor_id,
+            "successor_list": getattr(self, "successor_list", [])
+        })
 
     def _handle_notify(self, message: Message) -> Response:
         candidate_node_id = message.payload["node_id"]
