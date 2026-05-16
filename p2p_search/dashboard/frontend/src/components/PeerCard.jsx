@@ -86,9 +86,9 @@ function PeerCard({ nodeId, port, alive, state, isTraceNode }) {
           {state.successor_list && state.successor_list.length > 1 && (
              <div className="mt-2 bg-indigo-50/30 rounded border border-indigo-100/50 p-2 text-xs">
                 <span className="text-indigo-400 block text-[10px] uppercase font-bold mb-1">Backup Successors</span>
-                <div className="flex gap-2">
-                   {state.successor_list.slice(1).map(sid => (
-                      <span key={sid} className="font-mono bg-white px-1.5 py-0.5 rounded border border-indigo-100 text-indigo-600 font-medium">N{sid}</span>
+                <div className="flex flex-wrap gap-2">
+                   {state.successor_list.slice(1).map((sid, idx) => (
+                      <span key={`${sid}-${idx}`} className="font-mono bg-white px-1.5 py-0.5 rounded border border-indigo-100 text-indigo-600 font-medium">N{sid}</span>
                    ))}
                 </div>
              </div>

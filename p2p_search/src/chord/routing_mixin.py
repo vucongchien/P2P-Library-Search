@@ -296,7 +296,16 @@ class RoutingMixin:
             x = response.data.get("predecessor")
             # Cập nhật successor_list từ thông tin nhận được
             succ_list_from_node = response.data.get("successor_list", [])
-            self.successor_list = [self.successor_id] + succ_list_from_node[:r_size-1]
+            
+            # Làm sạch danh sách: Loại bỏ trùng lặp và chính mình, giữ thứ tự
+            new_list = [self.successor_id] + succ_list_from_node
+            seen = {self.node_id}
+            clean_list = []
+            for sid in new_list:
+                if sid not in seen:
+                    clean_list.append(sid)
+                    seen.add(sid)
+            self.successor_list = clean_list[:r_size]
 
             # x ∈ (self, successor)
             is_better_successor = False
@@ -310,7 +319,15 @@ class RoutingMixin:
                 self.successor_id = x
                 self.finger_table[0] = x # Đồng bộ finger table
                 # Nếu đổi successor, list sẽ được cập nhật ở vòng stabilize sau hoặc ngay tại đây
-                self.successor_list = [self.successor_id] + self.successor_list[:r_size-1]
+                # Nếu đổi successor, list sẽ được cập nhật lại để đảm bảo tính đúng đắn
+                new_list = [self.successor_id] + self.successor_list
+                seen = {self.node_id}
+                clean_list = []
+                for sid in new_list:
+                    if sid not in seen:
+                        clean_list.append(sid)
+                        seen.add(sid)
+                self.successor_list = clean_list[:r_size]
         else:
             # Successor đã chết! Phải tìm successor mới từ successor_list
             old_successor = self.successor_id
