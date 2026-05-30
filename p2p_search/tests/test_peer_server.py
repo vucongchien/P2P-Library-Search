@@ -289,10 +289,10 @@ class TestPublish:
         client.post("/api/stabilize", json={"rounds": 8})
         
         r = client.post("/api/publish", json={
-            "data": {
-                "system": [1, 2, 5],
-                "database": [1, 2, 3],
-            }
+            "stories": [
+                {"id": 1, "title": "system", "category": "tech", "content": "system"},
+                {"id": 2, "title": "database", "category": "tech", "content": "database"}
+            ]
         })
         assert r.status_code == 200
         data = r.json()

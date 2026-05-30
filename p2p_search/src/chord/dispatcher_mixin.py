@@ -18,6 +18,7 @@ class DispatcherMixin:
             "GET_CONTENT": self._handle_get_content,
             "STORE_CONTENT_REPLICA": self._handle_store_content_replica,
             "TRANSFER_KEYS": self._handle_transfer_keys,
+            "BULK_STORE_REPLICA": self._handle_bulk_store_replica,
             "PING": self._handle_ping
         }
         

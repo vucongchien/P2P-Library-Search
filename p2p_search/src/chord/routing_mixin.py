@@ -96,10 +96,13 @@ class RoutingMixin:
             reason=f"closest_preceding_node -> N{n_prime}"
         )
 
+        import time
+        start = time.perf_counter()
         response = self.transport.send(
             to_node_id=n_prime,
             message=Message("FIND_SUCCESSOR", self.node_id, {"key": key_id}, ttl=20)
         )
+        origin_hop.latency_ms = (time.perf_counter() - start) * 1000
 
         if not response.success:
             # Routing failure → thử recovery
@@ -178,10 +181,13 @@ class RoutingMixin:
             "reason": f"closest_preceding_node -> N{n_prime}"
         }
 
+        import time
+        start = time.perf_counter()
         response = self.transport.send(
              n_prime,
              Message("FIND_SUCCESSOR", self.node_id, {"key": key_id}, ttl=ttl - 1)
         )
+        my_hop["latency_ms"] = (time.perf_counter() - start) * 1000
 
         if response.success:
             # Prepend hop của mình vào path downstream
@@ -212,17 +218,21 @@ class RoutingMixin:
                 continue
                 
             if in_range(finger_id, self.node_id, key_id):
+                import time
+                start = time.perf_counter()
                 response = self.transport.send(
                     finger_id,
                     Message("FIND_SUCCESSOR", self.node_id, {"key": key_id}, ttl=20)
                 )
+                latency = (time.perf_counter() - start) * 1000
                 if response.success:
                     hop = RoutingHop(
                         node_id=self.node_id,
                         action="FORWARD",
                         target_key=key_id,
                         next_node=finger_id,
-                        reason=f"recovery: finger[{i}] -> N{finger_id} (N{dead_node_id} dead)"
+                        reason=f"recovery: finger[{i}] -> N{finger_id} (N{dead_node_id} dead)",
+                        latency_ms=latency
                     )
                     downstream = [RoutingHop.from_dict(h) for h in response.data.get("path", [])]
                     return RoutingTrace(
@@ -234,17 +244,21 @@ class RoutingMixin:
         
         # 2. Thử BẤT KỲ finger nào còn sống
         for finger_id in reversed([f for f in self.finger_table if f not in [None, self.node_id, dead_node_id]]):
+            import time
+            start = time.perf_counter()
             response = self.transport.send(
                 finger_id,
                 Message("FIND_SUCCESSOR", self.node_id, {"key": key_id}, ttl=20)
             )
+            latency = (time.perf_counter() - start) * 1000
             if response.success:
                 hop = RoutingHop(
                     node_id=self.node_id,
                     action="FORWARD",
                     target_key=key_id,
                     next_node=finger_id,
-                    reason=f"recovery: any alive finger -> N{finger_id}"
+                    reason=f"recovery: any alive finger -> N{finger_id}",
+                    latency_ms=latency
                 )
                 downstream = [RoutingHop.from_dict(h) for h in response.data.get("path", [])]
                 return RoutingTrace(
@@ -358,16 +372,28 @@ class RoutingMixin:
                             found_new = True
                             break
             
-            # Nếu tìm được Successor mới sau khi cái cũ chết, gửi Re-replicate
-            if self.successor_id != old_successor and self.successor_id != self.node_id:
-                if hasattr(self, '_re_replicate'):
-                    self._re_replicate(self.successor_id)
+        # Nếu tìm được Successor mới sau khi cái cũ chết
+        # KHÔNG gọi _re_replicate ở đây! Vì đây là thời điểm sai:
+        # - Các node lân cận có thể đang cần replica_store để tự promote khi phát hiện predecessor chết.
+        # - Gọi _re_replicate ngay lúc này sẽ ghi đè replica_store của successor (do BULK overwrite),
+        #   phá hủy dữ liệu backup mà successor đang cần để tự phục hồi.
+        # Việc đồng bộ replica sẽ diễn ra đúng thời điểm qua check_predecessor → promote → _re_replicate.
         
         # Thông báo cho successor về mình (nếu còn sống)
-        self.transport.send(
+        response = self.transport.send(
             self.successor_id,
             Message("NOTIFY", self.node_id, {"node_id": self.node_id})
         )
+        
+        # Nếu successor xác nhận đã cập nhật mình làm predecessor mới của nó,
+        # lập tức kích hoạt re-replicate để đồng bộ replica an toàn.
+        if response.success and response.data and response.data.get("updated"):
+            if hasattr(self, '_re_replicate'):
+                import logging
+                logging.getLogger("uvicorn.error").info(
+                    f"Node {self.node_id} received updated=True from successor N{self.successor_id}. Triggering re-replication..."
+                )
+                self._re_replicate(self.successor_id)
 
     def fix_fingers(self):
         """Định kỳ cập nhật một mục trong finger table."""
@@ -384,14 +410,28 @@ class RoutingMixin:
             self.next_finger_to_fix = 0
 
     def check_predecessor(self):
-        """Kiểm tra xem predecessor còn sống không."""
+        """Kiểm tra xem predecessor còn sống không (thử lại tối đa 3 lần để tránh báo động giả)."""
         if getattr(self, "predecessor_id", None) is not None:
-            response = self.transport.send(
-                self.predecessor_id,
-                Message("PING", self.node_id)
-            )
-            if not response.success:
-                # Predecessor đã chết!
+            import time
+            success = False
+            for attempt in range(3):
+                response = self.transport.send(
+                    self.predecessor_id,
+                    Message("PING", self.node_id),
+                    timeout_ms=1000  # Ping nhanh trong 1s
+                )
+                if response.success:
+                    success = True
+                    break
+                # Chờ một lát trước khi thử lại
+                time.sleep(0.1)
+                
+            if not success:
+                # Predecessor thực sự đã chết!
+                import logging
+                logging.getLogger("uvicorn.error").warning(
+                    f"Node {self.node_id} detected predecessor N{self.predecessor_id} DEAD after 3 failed pings. Promoting replicas..."
+                )
                 self.predecessor_id = None
                 
                 # 1. Promote Replicas to Primary
@@ -425,10 +465,21 @@ class RoutingMixin:
             old_predecessor_id = self.predecessor_id
             self.predecessor_id = candidate_node_id
             
+            # Chỉ xóa replica_store khi predecessor cũ đã là None hoặc chính mình
+            # (tức là đã promote xong hoặc đang ở trạng thái bootstrap).
+            # KHÔNG xóa nếu predecessor cũ còn sống — replica đó có thể vẫn đang cần
+            # để promote nếu predecessor sắp chết hoặc vừa chết nhưng check_predecessor chưa kịp chạy.
+            if old_predecessor_id is None or old_predecessor_id == self.node_id:
+                if hasattr(self, 'replica_store'):
+                    self.replica_store.clear()
+                if hasattr(self, 'replica_content_store'):
+                    self.replica_content_store.clear()
+            
             # Data Handoff: Chuyển giao key thuộc phạm vi predecessor mới
             self._transfer_keys_to_predecessor(candidate_node_id, old_predecessor_id)
+            return Response(success=True, data={"updated": True})
             
-        return Response(success=True)
+        return Response(success=True, data={"updated": False})
 
     def _handle_ping(self, message: Message) -> Response:
         return Response(success=True)

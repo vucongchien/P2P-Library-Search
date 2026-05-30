@@ -135,21 +135,17 @@ class StorageMixin:
         if target_successor_id is None or my_id is None or target_successor_id == my_id:
             return
             
-        # 1. Re-replicate DHT Store
-        for keyword, doc_ids in self.dht_store.items():
-            self.transport.send(
-                target_successor_id,
-                Message("STORE_REPLICA", my_id, {"keyword": keyword, "doc_ids": list(doc_ids)}),
-                timeout_ms=1000
-            )
-            
-        # 2. Re-replicate Content Store
-        for doc_id, content in self.content_store.items():
-            self.transport.send(
-                target_successor_id,
-                Message("STORE_CONTENT_REPLICA", my_id, {"doc_id": doc_id, "content": content}),
-                timeout_ms=1000
-            )
+        # Đóng gói toàn bộ dữ liệu Primary sang dạng JSON serializable
+        payload = {
+            "dht_store": {k: list(v) for k, v in self.dht_store.items()},
+            "content_store": {str(k): v for k, v in self.content_store.items()}
+        }
+        
+        self.transport.send(
+            target_successor_id,
+            Message("BULK_STORE_REPLICA", my_id, payload),
+            timeout_ms=5000  # Cho phép timeout lớn hơn vì payload có thể to
+        )
         
     def _handle_get_content(self, message: Message) -> Response:
         """Lấy nội dung document từ DHT."""
@@ -255,6 +251,83 @@ class StorageMixin:
         for doc_id_str, content in contents_data.items():
             doc_id = int(doc_id_str)
             self.content_store[doc_id] = content
+            
+        # Kích hoạt re-replicate bản sao của dữ liệu mới nhận này sang successor của mình
+        successor_id = getattr(self, "successor_id", None)
+        if successor_id is not None and successor_id != getattr(self, "node_id", None):
+            self._re_replicate(successor_id)
         
         return Response(success=True)
+
+    def _handle_bulk_store_replica(self, message: Message) -> Response:
+        """Nhận toàn bộ backup data từ Predecessor và ghi đè vào replica store."""
+        payload = message.payload
+        dht_data = payload.get("dht_store", {})
+        content_data = payload.get("content_store", {})
+        
+        # Xóa sạch replica cũ để đảm bảo đồng bộ hoàn hảo với predecessor hiện tại
+        self.replica_store.clear()
+        self.replica_content_store.clear()
+        
+        for keyword, doc_ids_list in dht_data.items():
+            self.replica_store[keyword] = set(doc_ids_list)
+            
+        for doc_id_str, content in content_data.items():
+            self.replica_content_store[int(doc_id_str)] = content
+            
+        return Response(success=True)
+
+    def maintain_data(self):
+        """
+        Self-healing: Định kỳ lọc các key/content không thuộc khoảng (predecessor, self]
+        và chuyển chúng về đúng chủ nhân thực sự.
+        """
+        pred_id = getattr(self, "predecessor_id", None)
+        my_id = getattr(self, "node_id", None)
+        
+        # Chỉ tự chữa lành nếu ring đã hình thành (có predecessor hợp lệ và khác mình)
+        if pred_id is None or pred_id == my_id:
+            return
+            
+        # 1. Bảo trì DHT Store
+        keys_to_remove = []
+        for keyword, doc_ids in list(self.dht_store.items()):
+            key_id = deterministic_hash(keyword, self.m)
+            # Nếu key KHÔNG thuộc khoảng quản lý
+            if not in_range(key_id, pred_id, my_id, inclusive_left=False, inclusive_right=True):
+                # Thử đẩy về đúng node quản lý
+                put_func = getattr(self, "put", None)
+                if put_func:
+                    # Gọi put của ChordNode
+                    success = put_func(keyword, doc_ids)
+                    if success:
+                        keys_to_remove.append(keyword)
+                        
+        for kw in keys_to_remove:
+            self.dht_store.pop(kw, None)
+            
+        # 2. Bảo trì Content Store
+        content_to_remove = []
+        if hasattr(self, 'content_store'):
+            for doc_id, content in list(self.content_store.items()):
+                key_id = deterministic_hash(str(doc_id), self.m)
+                if not in_range(key_id, pred_id, my_id, inclusive_left=False, inclusive_right=True):
+                    put_content_func = getattr(self, "put_content", None)
+                    if put_content_func:
+                        success = put_content_func(doc_id, content)
+                        if success:
+                            content_to_remove.append(doc_id)
+                            
+        for doc_id in content_to_remove:
+            self.content_store.pop(doc_id, None)
+            
+        # Nếu có dọn dẹp/chuyển giao dữ liệu, hãy cập nhật lại bản sao trên successor của mình
+        if keys_to_remove or content_to_remove:
+            import logging
+            logging.getLogger("uvicorn.error").info(
+                f"Node {my_id} self-healed: Moved {len(keys_to_remove)} keys and {len(content_to_remove)} contents to correct owners."
+            )
+            succ_id = getattr(self, "successor_id", None)
+            if succ_id is not None and succ_id != my_id:
+                self._re_replicate(succ_id)
 
