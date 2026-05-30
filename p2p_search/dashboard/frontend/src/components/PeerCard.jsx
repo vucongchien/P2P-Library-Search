@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
-import { Server, ChevronDown, ChevronRight, Hash, HardDrive, Share2, Activity, Database, FileText, Upload } from 'lucide-react';
+import { Server, ChevronDown, ChevronRight, Hash, HardDrive, Share2, Activity, Database, FileText, Upload, Link2 } from 'lucide-react';
 import { api } from '../api';
 
-export function PeerList({ peers, states, activeTrace }) {
+export function PeerList({ peers, states, activeTrace, refreshData }) {
   const traceNodeIds = new Set();
   if (activeTrace) {
     activeTrace.forEach(hop => {
@@ -27,10 +27,12 @@ export function PeerList({ peers, states, activeTrace }) {
           <PeerCard 
             key={peer.node_id} 
             nodeId={peer.node_id} 
+            url={peer.url}
             port={peer.url.split(':').pop()} 
             alive={peer.alive} 
             state={state} 
             isTraceNode={traceNodeIds.has(peer.node_id)}
+            refreshData={refreshData}
           />
         );
       })}
@@ -38,7 +40,10 @@ export function PeerList({ peers, states, activeTrace }) {
   );
 }
 
-function PeerCard({ nodeId, port, alive, state, isTraceNode }) {
+function PeerCard({ nodeId, url, port, alive, state, isTraceNode, refreshData }) {
+  const [isJoining, setIsJoining] = useState(false);
+  const [joinViaId, setJoinViaId] = useState('');
+
   if (!alive || !state) {
     return (
       <div className="bg-slate-50 border border-slate-200 p-4 rounded-lg flex flex-col items-center justify-center min-h-[300px]">
@@ -149,25 +154,81 @@ function PeerCard({ nodeId, port, alive, state, isTraceNode }) {
              <span title="Content files">Doc: {state.stats.content_count || 0}</span>
            </div>
          </div>
-         <div className="mt-1 flex justify-end">
-            <button 
-               onClick={async () => {
-                  const title = prompt(`Enter title for new story to upload to Node ${nodeId}:`, "A P2P Story");
-                  if (!title) return;
-                  const content = prompt("Enter the content of the story:");
-                  if (!content) return;
-                  
-                  const res = await api.uploadContent(nodeId, title, content);
-                  if (res.error || res.data?.status === 'error') {
-                     alert("Upload failed: " + (res.error || res.data?.detail));
-                  } else {
-                     alert(`Upload successful! New DocID generated: ${res.data.doc_id}`);
-                  }
-               }}
-               className="flex items-center gap-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 px-2 py-1 rounded transition-colors font-semibold"
-            >
-               <Upload size={12} /> Upload Content
-            </button>
+         <div className="mt-1 flex flex-col gap-2 w-full">
+            <div className="flex justify-end gap-2 w-full">
+               {!state.is_joined && !isJoining && (
+                  <button 
+                     onClick={() => setIsJoining(true)}
+                     className="flex items-center gap-1.5 bg-yellow-50 hover:bg-yellow-100 text-yellow-700 border border-yellow-200 px-2 py-1 rounded transition-colors font-semibold"
+                  >
+                     <Link2 size={12} /> Join Ring
+                  </button>
+               )}
+               <button 
+                  onClick={async () => {
+                     const title = prompt(`Enter title for new story to upload to Node ${nodeId}:`, "A P2P Story");
+                     if (!title) return;
+                     const content = prompt("Enter the content of the story:");
+                     if (!content) return;
+                     
+                     const res = await api.uploadContent(nodeId, title, content);
+                     if (res.error || res.data?.status === 'error') {
+                        alert("Upload failed: " + (res.error || res.data?.detail));
+                     } else {
+                        alert(`Upload successful! New DocID generated: ${res.data.doc_id}`);
+                     }
+                  }}
+                  className="flex items-center gap-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 px-2 py-1 rounded transition-colors font-semibold"
+               >
+                  <Upload size={12} /> Upload Content
+               </button>
+            </div>
+            {isJoining && (
+               <div className="w-full bg-yellow-50/80 border border-yellow-200 p-2.5 rounded-md flex flex-col gap-2 shadow-sm animate-in fade-in slide-in-from-top-2 duration-200">
+                 <p className="text-xs text-yellow-800 font-semibold flex items-center gap-1.5"><Link2 size={12} /> Join Ring via Node ID</p>
+                 <div className="flex gap-2">
+                   <input 
+                     type="number" 
+                     className="flex-grow bg-white border border-yellow-300 rounded px-2 py-1.5 text-xs text-slate-800 focus:outline-none focus:border-yellow-500 focus:ring-1 focus:ring-yellow-500 shadow-inner"
+                     placeholder="e.g. 10 (leave empty for genesis node)"
+                     value={joinViaId}
+                     onChange={e => setJoinViaId(e.target.value)}
+                     autoFocus
+                   />
+                   <button 
+                     className="bg-yellow-500 hover:bg-yellow-600 text-white px-3 py-1.5 rounded text-xs font-bold transition-colors shadow-sm"
+                     onClick={async () => {
+                       const vId = joinViaId.trim() ? parseInt(joinViaId, 10) : null;
+                       try {
+                          const res = await fetch(`${url}/api/join`, {
+                             method: 'POST',
+                             headers: { 'Content-Type': 'application/json' },
+                             body: JSON.stringify({ known_node_id: vId })
+                          });
+                          const resData = await res.json();
+                          if (resData.status === 'ok' || resData.status === 'already_joined') {
+                             setIsJoining(false);
+                             setJoinViaId('');
+                             if (refreshData) refreshData();
+                          } else {
+                             alert(`Failed to join: ${resData.detail || JSON.stringify(resData)}`);
+                          }
+                       } catch (e) {
+                          alert(`Error connecting to peer server: ${e.message}`);
+                       }
+                     }}
+                   >
+                     Join
+                   </button>
+                   <button 
+                     className="bg-slate-200 hover:bg-slate-300 text-slate-700 px-3 py-1.5 rounded text-xs font-semibold transition-colors"
+                     onClick={() => setIsJoining(false)}
+                   >
+                     Cancel
+                   </button>
+                 </div>
+               </div>
+            )}
          </div>
       </div>
     </div>

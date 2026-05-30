@@ -75,7 +75,7 @@ function App() {
              {aliveNodes.length} nodes
           </span>
         </h2>
-        <PeerList peers={peers} states={states} activeTrace={activeTrace} />
+        <PeerList peers={peers} states={states} activeTrace={activeTrace} refreshData={refreshNow} />
       </div>
 
       <MetricsBar metrics={metrics} states={states} />
