@@ -15,8 +15,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "dashboard", "backend"))
 
 from fastapi.testclient import TestClient
-from dashboard.backend.dashboard_server import create_dashboard_app, _build_local_index, parse_peers
-
+from dashboard.backend.dashboard_server import create_dashboard_app, parse_peers
 
 # ============================================================
 # TEST: Helper functions
@@ -41,44 +40,6 @@ class TestParsePeers:
             10: "http://127.0.0.1:8001",
             60: "http://127.0.0.1:8002",
         }
-
-
-class TestBuildLocalIndex:
-    def test_basic_tokenize(self):
-        docs = [
-            {"id": 1, "title": "System Design", "content": "distributed system architecture"},
-            {"id": 2, "title": "Database", "content": "query optimization system"},
-        ]
-        index = _build_local_index(docs)
-        
-        assert "system" in index
-        assert 1 in index["system"]
-        assert 2 in index["system"]
-        
-        assert "distributed" in index
-        assert 1 in index["distributed"]
-    
-    def test_stopwords_removed(self):
-        docs = [{"id": 1, "title": "The", "content": "the and or but"}]
-        index = _build_local_index(docs)
-        assert "the" not in index
-        assert "and" not in index
-    
-    def test_short_words_removed(self):
-        docs = [{"id": 1, "title": "AB", "content": "ab cd ef gh"}]
-        index = _build_local_index(docs)
-        assert "ab" not in index  # len <= 2
-    
-    def test_empty_docs(self):
-        index = _build_local_index([])
-        assert index == {}
-    
-    def test_doc_without_id_skipped(self):
-        docs = [{"title": "No ID", "content": "missing identifier"}]
-        index = _build_local_index(docs)
-        # Should not crash, keywords should map to no valid doc_ids
-        for kw, ids in index.items():
-            assert len(ids) == 0 or all(isinstance(i, int) for i in ids)
 
 
 # ============================================================
@@ -127,6 +88,21 @@ class TestDashboardNoServers:
         r = dashboard.post("/api/churn/remove", json={"node_id": 999})
         data = r.json()
         assert data["status"] == "error"
+
+    def test_add_peer_success(self, dashboard):
+        """Test API add peer động bằng JSON body."""
+        r = dashboard.post("/api/peers/add", json={"node_id": 135, "url": "http://127.0.0.1:8006"})
+        assert r.status_code == 200
+        data = r.json()
+        assert data["status"] == "ok"
+        assert data["node_id"] == 135
+
+        # Verify peer was added
+        r_list = dashboard.get("/api/peers")
+        peers_list = r_list.json()["peers"]
+        added_peer = next((p for p in peers_list if p["node_id"] == 135), None)
+        assert added_peer is not None
+        assert added_peer["url"] == "http://127.0.0.1:8006"
     
     def test_data_preview_no_file(self, dashboard):
         r = dashboard.get("/api/data-preview")
@@ -169,7 +145,8 @@ class TestDashboardWithData:
         r = dashboard_with_data.post("/api/setup/publish")
         data = r.json()
         assert data["status"] == "ok"
-        assert data["total_docs"] == 3
+        assert "10" in data["results"]
+        assert data["results"]["10"]["stories_assigned"] == 3
 
 
 # ============================================================
@@ -270,13 +247,18 @@ class TestIntegrationWithRealPeers:
         # 6. Publish data
         import httpx
         for nid, port in self.ports.items():
-            # Mỗi peer publish 1 keyword
-            data = {"system": [1, 2], "database": [2, 3]} if nid == 10 else \
-                   {"network": [4, 5]} if nid == 60 else \
-                   {"system": [6, 7]}
+            # Mỗi peer publish raw stories chứa các keyword tương ứng
+            stories = [
+                {"id": 1, "title": "System Design", "category": "tech", "content": "distributed database system"},
+                {"id": 2, "title": "Database", "category": "tech", "content": "query optimization system"}
+            ] if nid == 10 else [
+                {"id": 4, "title": "Network", "category": "tech", "content": "network routing transport"}
+            ] if nid == 60 else [
+                {"id": 6, "title": "System Design", "category": "tech", "content": "operating system kernel"}
+            ]
             r = httpx.post(
                 f"http://127.0.0.1:{port}/api/publish",
-                json={"data": data},
+                json={"stories": stories},
                 timeout=10.0
             )
             assert r.status_code == 200
@@ -285,10 +267,9 @@ class TestIntegrationWithRealPeers:
         r = client.post("/api/query", json={"query": "system", "initiator_node_id": 10})
         data = r.json()
         assert data["status"] == "ok"
-        # "system" published by Node 10 ([1,2]) and Node 110 ([6,7])
-        # DHT merge_put → {1,2,6,7}
+        # "system" xuất hiện ở doc 1, 2 (node 10) và doc 6 (node 110)
         result_set = set(data["final_result"])
-        assert result_set == {1, 2, 6, 7}, f"Expected {{1,2,6,7}}, got {result_set}"
+        assert result_set == {1, 2, 6}, f"Expected {{1,2,6}}, got {result_set}"
         
         # 8. Verify metrics
         r = client.get("/api/metrics")

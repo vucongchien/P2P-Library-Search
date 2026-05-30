@@ -76,6 +76,10 @@ class UploadRequest(BaseModel):
     content: str
     title: Optional[str] = "Untitled Document"
 
+class AddPeerRequest(BaseModel):
+    node_id: int
+    url: str
+
 
 # ============================================================
 # Peer HTTP Client — thin wrapper to avoid repeating error handling
@@ -162,8 +166,10 @@ def create_dashboard_app(
         return {"peers": result}
 
     @app.post("/api/peers/add")
-    def add_peer(node_id: int, url: str):
+    def add_peer(req: AddPeerRequest):
         """Đăng ký thêm 1 peer mới vào Dashboard (chưa join ring)."""
+        node_id = req.node_id
+        url = req.url
         if node_id in peers:
             return {"status": "error", "detail": "Node ID already exists"}
             
