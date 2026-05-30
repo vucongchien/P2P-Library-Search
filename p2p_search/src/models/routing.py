@@ -21,6 +21,7 @@ class RoutingHop:
     target_key: int             # key đang tìm
     next_node: Optional[int]    # node tiếp theo (nếu FORWARD) hoặc successor (nếu RESOLVED)
     reason: str                 # lý do chính xác (e.g., "key 73 ∈ (60, 110]")
+    latency_ms: Optional[float] = None  # Thời gian hoàn thành nếu có gửi mạng
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -29,6 +30,7 @@ class RoutingHop:
             "target_key": self.target_key,
             "next_node": self.next_node,
             "reason": self.reason,
+            "latency_ms": self.latency_ms,
         }
 
     @classmethod
@@ -39,6 +41,7 @@ class RoutingHop:
             target_key=data["target_key"],
             next_node=data.get("next_node"),
             reason=data["reason"],
+            latency_ms=data.get("latency_ms"),
         )
 
 
@@ -84,5 +87,6 @@ class RoutingTrace:
             arrow = ""
             if hop.next_node is not None:
                 arrow = f" --> N{hop.next_node}"
-            lines.append(f"{prefix} [{hop.action}] N{hop.node_id}{arrow}  ({hop.reason})")
+            lat_str = f" [{hop.latency_ms:.1f}ms]" if getattr(hop, "latency_ms", None) is not None else ""
+            lines.append(f"{prefix} [{hop.action}] N{hop.node_id}{arrow}{lat_str}  ({hop.reason})")
         return "\n".join(lines)

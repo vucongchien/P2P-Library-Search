@@ -136,6 +136,7 @@ def create_app(node_id: int, port: int, m: int = 8) -> FastAPI:
                 node.stabilize()
                 node.fix_fingers()
                 node.check_predecessor()
+                node.maintain_data()  # Kích hoạt tự động chữa lành dữ liệu đi lạc
                 
                 # Log trạng thái định kỳ để người dùng dễ theo dõi
                 logger.info(f"N{node_id} STATE: Successor=N{node.successor_id}, Predecessor=N{node.predecessor_id if node.predecessor_id else 'None'}")
@@ -282,6 +283,10 @@ def create_app(node_id: int, port: int, m: int = 8) -> FastAPI:
             tokens = set(tokenize(cleaned_text))
             
             for keyword in tokens:
+                if keyword not in node.local_index:
+                    node.local_index[keyword] = set()
+                node.local_index[keyword].add(doc_id)
+                
                 node.put(keyword, {doc_id})
                 published_keywords.add(keyword)
         
@@ -316,6 +321,9 @@ def create_app(node_id: int, port: int, m: int = 8) -> FastAPI:
         3. Intersect results
         4. Trả full trace
         """
+        import time
+        start_time = time.perf_counter()
+        
         node = app.state.node
         keywords = [k.strip() for k in req.query.lower().split() if k.strip() != "and"]
         
@@ -356,6 +364,10 @@ def create_app(node_id: int, port: int, m: int = 8) -> FastAPI:
         
         total_messages = len(app.state.transport.message_log) - start_log_idx
         
+        # Calculate hops and latency
+        total_hops = sum(l.get("routing_trace", {}).get("hop_count", 0) for l in lookups)
+        latency_ms = (time.perf_counter() - start_time) * 1000
+        
         return {
             "status": "ok",
             "query": req.query,
@@ -364,6 +376,8 @@ def create_app(node_id: int, port: int, m: int = 8) -> FastAPI:
             "lookups": lookups,
             "final_result": sorted(final_doc_ids) if final_doc_ids else [],
             "total_messages": total_messages,
+            "total_hops": total_hops,
+            "latency_ms": latency_ms,
         }
 
     @app.get("/api/content/{doc_id}")

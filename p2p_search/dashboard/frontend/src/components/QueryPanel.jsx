@@ -152,6 +152,12 @@ export function QueryPanel({ peers, onTraceUpdate }) {
                   <div className="mt-2 text-xs text-slate-500 flex gap-4">
                      <span>Initiator: <strong>N{result.initiator}</strong></span>
                      <span>Total Messages: <strong>{result.total_messages}</strong></span>
+                     {result.total_hops !== undefined && (
+                         <span>Total Hops: <strong>{result.total_hops}</strong></span>
+                     )}
+                     {result.latency_ms !== undefined && (
+                         <span>Latency: <strong>{result.latency_ms.toFixed(2)} ms</strong></span>
+                     )}
                   </div>
                 </div>
 
@@ -187,6 +193,12 @@ export function QueryPanel({ peers, onTraceUpdate }) {
                                       
                                       {hop.next_node !== hop.node && (
                                         <span className="bg-slate-100 text-slate-600 px-1.5 rounded border border-slate-200">N{hop.next_node}</span>
+                                      )}
+                                      
+                                      {hop.latency_ms !== undefined && hop.latency_ms !== null && (
+                                        <span className="text-[10px] text-slate-500 font-medium whitespace-nowrap ml-1">
+                                          ({Number(hop.latency_ms).toFixed(1)}ms)
+                                        </span>
                                       )}
                                    </div>
                                    <span className="text-slate-400 pl-1 border-l-2 border-slate-100 ml-3 py-0.5" style={{fontFamily: 'sans-serif'}}>{hop.reason}</span>
