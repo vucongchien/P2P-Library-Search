@@ -31,7 +31,7 @@ Mỗi bản ghi log trong `Transport.message_log` bao gồm:
 
 ---
 
-## 3. Kế hoạch nâng cấp (Future Improvements Plan)
+## 3. Kế hoạch nâng cấp (Future Improvements Plan) [ CHƯA TRIỂN KHAI ]
 
 Mục tiêu là chuyển đổi từ ghi log đơn thuần sang **Distributed Tracing**.
 

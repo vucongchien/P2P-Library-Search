@@ -79,17 +79,15 @@
 | DHT | Chord protocol (ring, finger table, successor/predecessor) |
 | Index | Distributed Inverted Index: keyword → Set[DocID] |
 | Query | AND query resolution (sequential, trace từng bước) |
-| Output | JSON trace, PNG topology graph |
+| UI web interface | Scope là console + visualization |
 
 ### 3.2 Ngoài phạm vi (Out of Scope)
 
 | Hạng mục | Lý do loại |
 |---|---|
 | Real network (socket/HTTP) | Quá phức tạp, không cần thiết cho học thuật |
-| UI web interface | Scope là console + visualization |
 | OR / NOT query | Chỉ cần AND theo đề bài |
 | Ranking / TF-IDF | Chỉ cần boolean match, không cần xếp hạng |
-| Persisting state trên disk | Simulated in-memory đủ rồi |
 | Security / Authentication | Không thuộc scope distributed systems |
 
 ---
