@@ -1,1 +1,0 @@
-(1) Query type: chỉ có AND / OR , không có Pharse 
