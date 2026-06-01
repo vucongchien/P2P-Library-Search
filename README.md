@@ -5,10 +5,6 @@
 [![React](https://img.shields.io/badge/React-18.x-61DAFB?logo=react&logoColor=black)](https://react.dev/)
 [![Vite](https://img.shields.io/badge/Vite-5.x-646CFF?logo=vite&logoColor=white)](https://vitejs.dev/)
 
-> [!NOTE]  
-> **Lưu ý cấu trúc dự án:**  
-> Đây là thư mục gốc của học phần Công nghệ mạng và Hệ thống phân tán. Toàn bộ mã nguồn thực thi của hệ thống (Source Code) được đóng gói độc lập bên trong thư mục **[p2p_search](file:///e:/LEARN/HTPT/p2p_search)**. File README này đóng vai trò hướng dẫn tổng quan toàn dự án.
-
 ---
 
 ## 🏛️ MỤC I: TỔNG QUAN HỆ THỐNG & TẦM NHÌN DỰ ÁN
