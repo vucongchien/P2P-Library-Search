@@ -8,9 +8,10 @@ thực hiện quyết định routing.
 
 from typing import List, Set, Dict
 from src.chord.ring import ChordRing
+from src.chord.utils import deterministic_hash
 from src.models import KeywordLookup, HopEvent, QueryResult, ExecutionStatus, ResultStatus
 from src.models import RoutingTrace, RoutingHop
-from src.chord.utils import deterministic_hash
+from src.preprocessing import clean_text, tokenize
 
 class QueryEngine:
     def __init__(self, ring: ChordRing):
@@ -22,8 +23,9 @@ class QueryEngine:
         
         Trace chính xác 100%: đọc từ routing response, không suy đoán.
         """
-        # 1. Tiền xử lý truy vấn
-        keywords = [k for k in raw_query.lower().split() if k != "and"]
+        # 1. Tiền xử lý truy vấn đồng bộ với chiều ghi
+        cleaned_query = clean_text(raw_query, "")
+        keywords = tokenize(cleaned_query)
         
         if not keywords:
             return QueryResult(

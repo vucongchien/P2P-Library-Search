@@ -325,7 +325,8 @@ def create_app(node_id: int, port: int, m: int = 8) -> FastAPI:
         start_time = time.perf_counter()
         
         node = app.state.node
-        keywords = [k.strip() for k in req.query.lower().split() if k.strip() != "and"]
+        cleaned_query = clean_text(req.query, "")
+        keywords = tokenize(cleaned_query)
         
         if not keywords:
             return {"status": "error", "detail": "Empty query"}
