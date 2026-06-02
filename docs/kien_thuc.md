@@ -96,7 +96,7 @@ Khi node rời đi:
 - khi data leave, node leave phải chuyển data cho successor của nó
 
 
-![alt text](/img/image.png)
+![alt text](./img/image.png)
 
 
 # Kiến trúc lưu trữ dữ liệu trong DHT P2P Search ở mỗi peer 
@@ -130,7 +130,7 @@ message_log: Lưu trữ toàn bộ lịch sử gói tin (Traffic) truyền đi, 
 
 # Nguyên tắc upload data
 
-![alt text](/img/nguyen_tac_upload_data.png)
+![alt text](./img/nguyen_tac_upload_data.png)
 
 
 2. Flow đúng khi upload story
