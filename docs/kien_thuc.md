@@ -207,7 +207,7 @@ Kịch bản Demo cho Thầy (Dynamic Join):
 Bước 1: Chạy một Node mới thủ công Khi thầy bảo: "Bây giờ tôi muốn thêm 1 Node nữa vào mạng thì làm thế nào?", bạn hãy mở một Terminal mới (ngoài 6 cái đang có) và gõ lệnh:
 
 powershell
-uv run peer_server.py --node-id 135 --port 8006 --m 8
+uv run peer_server.py --node-id 135 --port 8006 --m 8 --auto-stabilize --stabilize-interval 5
 (Lúc này Node 135 đã chạy nhưng nó đứng một mình, chưa ai biết đến nó).
 
 Bước 2: Đăng ký Node vào Dashboard Trên giao diện Web, bạn sẽ thấy tôi vừa thêm phần "Professor Demo: Dynamic Join".

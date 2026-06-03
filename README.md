@@ -158,7 +158,7 @@ uv run demo_split.py
 ### 📍 Kịch Bản 1: Gia Nhập Node Mới Động (Dynamic Join)
 *   **Bước 1:** Khởi chạy độc lập một Node mới mang mã ID `135` trên cổng `8006` bằng cách mở một Terminal mới và chạy:
     ```bash
-    uv run peer_server.py --node-id 135 --port 8006 --m 8
+    uv run peer_server.py --node-id 135 --port 8006 --m 8 --auto-stabilize --stabilize-interval 5
     ```
 *   **Bước 2:** Trên giao diện Dashboard Web, tìm đến phần **"Professor Demo: Dynamic Join"**. Nhập Node ID: `135`, Port: `:8006` và bấm **Add Peer to Dashboard**. Node 135 sẽ hiển thị độc lập trên sơ đồ mạng.
 *   **Bước 3:** Nhấp nút **Join** trên thẻ Node 135, nhập ID của một Node trung gian bất kỳ đang chạy (ví dụ: `10`) để dẫn đường và bấm **OK**.
