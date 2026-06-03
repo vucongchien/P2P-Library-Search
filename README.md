@@ -87,9 +87,7 @@ Dưới đây là sơ đồ tổ chức của dự án. Xin lưu ý toàn bộ m
 
 ```text
 📂 P2P-Library-Search (Thư mục gốc)
-├── 📂 bao_cao_mon_hoc      # Tài liệu báo cáo, slide thuyết trình môn học
-├── 📂 docs                 # Các tài liệu đặc tả thiết kế hệ thống
-├── 📅 kien_thuc.md         # Tổng hợp kiến thức và cơ chế lý thuyết Chord DHT
+├── 📂 docs                 # Các tài liệu liên quan.
 ├── 📅 p2p_library_100_stories.json # Dataset mẫu chứa 100 tác phẩm truyện
 ├── 📅 README.md            # [BẠN ĐANG Ở ĐÂY] Tài liệu tổng quan toàn bộ dự án
 │
